@@ -1,0 +1,63 @@
+public BookingDTO bookMedicines(int userId, List<MedicineQuantityDTO> medicineQuantities) {
+	    User user = userRepository.findById(userId)
+	            .orElseThrow(() -> new UserNotFoundException("User with ID " + userId + " not found"));
+
+	    Booking booking = new Booking(user);
+	    double totalMedicinePrice = 0.0;
+
+	    for (MedicineQuantityDTO dto : medicineQuantities) {
+	        int medicineId = dto.getMedicineId();
+	        int quantity = dto.getQuantity();
+
+	        Medicine medicine = medicineRepository.findById(medicineId)
+	                .orElseThrow(() -> new MedicineNotFoundException("Medicine with ID " + medicineId + " not found"));
+
+	        if (medicine.getQuantity() < quantity) {
+	            throw new InsufficientMedicineQuantityException("Insufficient quantity of medicine available");
+	        }
+
+	        BookingMedicine bookingMedicine = new BookingMedicine();
+	        bookingMedicine.setBooking(booking);
+	        bookingMedicine.setMedicine(medicine);
+	        bookingMedicine.setQuantity(quantity);
+
+	        booking.getBookedMedicines().add(bookingMedicine);
+
+	        double medicinePrice = medicine.getPrice();
+	        totalMedicinePrice += (medicinePrice * quantity);
+	    }
+
+	    // Save the booking entity here
+	    bookingRepository.save(booking);
+
+	    // Update medicine quantities and save the user
+	    for (MedicineQuantityDTO dto : medicineQuantities) {
+	        int medicineId = dto.getMedicineId();
+	        int quantity = dto.getQuantity();
+	        Medicine medicine = medicineRepository.findById(medicineId)
+	                .orElseThrow(() -> new MedicineNotFoundException("Medicine with ID " + medicineId + " not found"));
+	        medicine.setQuantity(medicine.getQuantity() - quantity);
+	    }
+	    userRepository.save(user);
+
+	    BookingDTO bookingDTO = new BookingDTO();
+	    
+	    // Set properties of the bookingDTO
+	    bookingDTO.setBookingId(booking.getBookingId());
+	    bookingDTO.setBookingDate(booking.getBookingDate());
+	    bookingDTO.setUser(UserDTO.fromUser(user));
+
+	    // Create a list of booked medicines from bookedMedicines in the booking entity
+	    List<MedicineQuantityDTO> bookedMedicines = new ArrayList<>();
+	    for (BookingMedicine bookingMedicine : booking.getBookedMedicines()) {
+	        MedicineQuantityDTO medicineQuantityDTO = new MedicineQuantityDTO();
+	        medicineQuantityDTO.setMedicineId(bookingMedicine.getMedicine().getMedicineId());
+	        medicineQuantityDTO.setQuantity(bookingMedicine.getQuantity());
+	  
+	        bookedMedicines.add(medicineQuantityDTO);
+	    }
+	    bookingDTO.setBookedMedicines(bookedMedicines);
+
+	    return bookingDTO;
+	
+	}
